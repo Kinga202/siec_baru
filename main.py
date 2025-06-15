@@ -1,5 +1,5 @@
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import tkintermapview
 import requests
 from bs4 import BeautifulSoup
@@ -262,18 +262,29 @@ class App:
         self.map_employees.set_position(52.23, 21.00)
         self.map_employees.set_zoom(6)
 
-
     def add_bar(self):
-        name = self.entry_bar_name.get()
-        location = self.entry_bar_location.get()
-        rating = self.entry_bar_rating.get()
-        if not name or not location or not rating:
+        name = self.entry_bar_name.get().strip()
+        loc = self.entry_bar_location.get().strip()
+        rating = self.entry_bar_rating.get().strip()
+
+        if not name or not loc or not rating:
+            messagebox.showwarning("Błąd", "Wypełnij wszystkie pola (nazwa, lokalizacja, ocena).")
             return
-        bar = Bar(name, location, rating, self.map_bars)
-        self.bars.append(bar)
-        self.listbox_bars.insert(END, f"{bar.name}")
-        for entry in [self.entry_bar_name, self.entry_bar_location, self.entry_bar_rating]:
-            entry.delete(0, END)
+
+        try:
+            rating = int(rating)
+            if not (1 <= rating <= 5):
+                raise ValueError("Ocena spoza zakresu")
+
+            bar = Bar(name, loc, rating, self.map_bars)
+            self.bars.append(bar)
+            self.listbox_bars.insert(END, name)
+
+            self.entry_bar_name.delete(0, END)
+            self.entry_bar_location.delete(0, END)
+            self.entry_bar_rating.delete(0, END)
+        except Exception as e:
+            messagebox.showwarning("Błąd", f"Nieprawidłowe dane lub lokalizacja.\n{e}")
 
     def show_bar_details(self):
         i = self.listbox_bars.curselection()
