@@ -4,6 +4,7 @@ import tkintermapview
 import requests
 from bs4 import BeautifulSoup
 
+
 class Bar:
     def __init__(self, name, location, rating, map_widget):
         self.name = name
@@ -11,7 +12,8 @@ class Bar:
         self.rating = rating
         self.map_widget = map_widget
         self.coordinates = self.get_coordinates()
-        self.marker = self.map_widget.set_marker(self.coordinates[0], self.coordinates[1], text=f'{self.name} {self.rating}')
+        self.marker = self.map_widget.set_marker(self.coordinates[0], self.coordinates[1],
+                                                 text=f'{self.name} {self.rating}')
 
     def get_coordinates(self):
         try:
@@ -53,6 +55,32 @@ class Client:
             return [52.23, 21.00]
 
 
+class Employee:
+    def __init__(self, bar_name, employee_name, employee_surname, location, years_of_work, map_widget):
+        self.bar_name = bar_name
+        self.employee_name = employee_name
+        self.employee_surname = employee_surname
+        self.location = location
+        self.years_of_work = years_of_work
+        self.map_widget = map_widget
+        self.coordinates = self.get_coordinates()
+        self.marker = self.map_widget.set_marker(
+            self.coordinates[0], self.coordinates[1],
+            text=f'{self.bar_name}: {self.employee_name} {self.employee_surname}'
+        )
+
+    def get_coordinates(self):
+        try:
+            adres_url = f'https://pl.wikipedia.org/wiki/{self.location}'
+            response_html = BeautifulSoup(requests.get(adres_url).content, 'html.parser')
+            return [
+                float(response_html.select('.latitude')[1].text.replace(',', '.')),
+                float(response_html.select('.longitude')[1].text.replace(',', '.')),
+            ]
+        except Exception as e:
+            print("Błąd pobierania współrzędnych:", e)
+            return [52.23, 21.00]
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -61,6 +89,7 @@ class App:
 
         self.bars = []
         self.clients = []
+        self.employees = []
 
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill='both', expand=True)
@@ -71,8 +100,12 @@ class App:
         self.frame_clients = Frame(self.notebook)
         self.notebook.add(self.frame_clients, text='Klienci')
 
+        self.frame_employees = Frame(self.notebook)
+        self.notebook.add(self.frame_employees, text='Pracownicy')
+
         self.setup_bars_tab()
         self.setup_clients_tab()
+        self.setup_employees_tab()
 
     def setup_bars_tab(self):
         frame_list = Frame(self.frame_bars)
@@ -178,6 +211,57 @@ class App:
         self.map_clients.set_position(52.23, 21.00)
         self.map_clients.set_zoom(6)
 
+    def setup_employees_tab(self):
+        frame_list = Frame(self.frame_employees)
+        frame_list.grid(row=0, column=0, padx=10, pady=10, sticky='n')
+
+        Label(frame_list, text="Lista pracowników:").pack()
+        self.listbox_employees = Listbox(frame_list, width=50, height=10)
+        self.listbox_employees.pack()
+
+        Button(frame_list, text="Pokaż szczegóły", command=self.show_employee_details()).pack(side=LEFT, padx=5, pady=5)
+        Button(frame_list, text="Usuń", command=self.remove_employee).pack(side=LEFT, padx=5, pady=5)
+        Button(frame_list, text="Edytuj", command=self.edit_employee).pack(side=LEFT, padx=5, pady=5)
+
+        frame_form = Frame(self.frame_employees)
+        frame_form.grid(row=0, column=1, padx=10, pady=10, sticky='n')
+
+        Label(frame_form, text="Formularz dodawania pracownika").grid(row=0, column=0, columnspan=2)
+
+        self.entry_employee_bar = Entry(frame_form)
+        self.entry_employee_name = Entry(frame_form)
+        self.entry_employee_surname = Entry(frame_form)
+        self.entry_employee_location = Entry(frame_form)
+        self.entry_employee_years_of_work = Entry(frame_form)
+
+
+
+        labels = ["Bar:", "Imię:", "Nazwisko:", "Miejscowość:", "Lata pracy:"]
+        entries = [self.entry_employee_bar, self.entry_employee_name, self.entry_employee_surname, self.entry_employee_location, self.entry_employee_years_of_work]
+
+        for i, (label, entry) in enumerate(zip(labels, entries), start=1):
+            Label(frame_form, text=label).grid(row=i, column=0, sticky=W)
+            entry.grid(row=i, column=1)
+
+        self.btn_add_employee = Button(frame_form, text="Dodaj", command=self.add_employee)
+        self.btn_add_employee.grid(row=6, column=0, columnspan=2, pady=5)
+
+        frame_details = Frame(self.frame_employees)
+        frame_details.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky='w')
+
+        Label(frame_details, text="Szczegóły pracownika:").grid(row=0, column=0, columnspan=6)
+
+        detail_labels = ["Bar:", "Imię:", "Nazwisko:", "Miejscowość:", "Lata pracy:"]
+        self.detail_vars_employees = [Label(frame_details, text="...") for _ in detail_labels]
+        for i, (label, var) in enumerate(zip(detail_labels, self.detail_vars_employees)):
+            Label(frame_details, text=label).grid(row=1, column=i * 2, padx=5, pady=5)
+            var.grid(row=1, column=i * 2 + 1, padx=5, pady=5)
+
+        self.map_employees = tkintermapview.TkinterMapView(self.frame_employees, width=1200, height=400)
+        self.map_employees.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+        self.map_employees.set_position(52.23, 21.00)
+        self.map_employees.set_zoom(6)
+
 
     def add_bar(self):
         name = self.entry_bar_name.get()
@@ -212,9 +296,12 @@ class App:
         i = self.listbox_bars.curselection()
         if not i: return
         bar = self.bars[i[0]]
-        self.entry_bar_name.delete(0, END); self.entry_bar_name.insert(0, bar.name)
-        self.entry_bar_location.delete(0, END); self.entry_bar_location.insert(0, bar.location)
-        self.entry_bar_rating.delete(0, END); self.entry_bar_rating.insert(0, bar.rating)
+        self.entry_bar_name.delete(0, END);
+        self.entry_bar_name.insert(0, bar.name)
+        self.entry_bar_location.delete(0, END);
+        self.entry_bar_location.insert(0, bar.location)
+        self.entry_bar_rating.delete(0, END);
+        self.entry_bar_rating.insert(0, bar.rating)
         self.btn_add_bar.config(text="Zapisz", command=lambda idx=i[0]: self.update_bar(idx))
 
     def update_bar(self, idx):
@@ -300,7 +387,77 @@ class App:
             entry.delete(0, END)
 
 
-if __name__ == "__main__":
-    root = Tk()
-    app = App(root)
-    root.mainloop()
+    def add_employee(self):
+        bar = self.entry_employee_bar.get()
+        name = self.entry_employee_name.get()
+        surname = self.entry_employee_surname.get()
+        location = self.entry_employee_location.get()
+        years_of_work = self.entry_employee_years_of_work.get()
+        if not bar or not name or not surname or not location or not years_of_work:
+            return
+        employee = Employee(bar, name, surname, location, years_of_work, self.map_employees)
+        self.employees.append(employee)
+        self.listbox_employees.insert(END, f"{name} {surname}")
+        for entry in [self.entry_employee_bar, self.entry_employee_name, self.entry_employee_surname,
+                      self.entry_employee_location, self.entry_employee_years_of_work]:
+            entry.delete(0, END)
+
+
+    def show_employee_details(self):
+        i = self.listbox_employees.curselection()
+        if not i: return
+        c = self.employees[i[0]]
+        texts = [c.bar_name, c.employee_name, c.employee_surname, c.location, c.years_of_work]
+        for lbl, txt in zip(self.detail_vars_employees, texts):
+            lbl.config(text=txt)
+        self.map_employees.set_position(*c.coordinates)
+        self.map_employees.set_zoom(15)
+
+
+    def remove_employee(self):
+        i = self.listbox_employees.curselection()
+        if not i: return
+        c = self.employees.pop(i[0])
+        c.marker.delete()
+        self.listbox_employees.delete(i)
+
+
+    def edit_employee(self):
+        i = self.listbox_employees.curselection()
+        if not i: return
+        c = self.employees[i[0]]
+        self.entry_employee_bar.delete(0, END);
+        self.entry_employee_bar.insert(0, c.bar_name)
+        self.entry_employee_name.delete(0, END);
+        self.entry_employee_name.insert(0, c.employee_name)
+        self.entry_employee_surname.delete(0, END);
+        self.entry_employee_surname.insert(0, c.employee_surname)
+        self.entry_employee_location.delete(0, END);
+        self.entry_employee_location.insert(0, c.location)
+        self.entry_employee_years_of_work.delete(0, END);
+        self.entry_employee_years_of_work.insert(0, c.years_of_work)
+        self.btn_add_employee.config(text="Zapisz", command=lambda idx=i[0]: self.update_employee(idx))
+
+
+    def update_employee(self, idx):
+        c = self.employees[idx]
+        c.bar_name = self.entry_employee_bar.get()
+        c.employee_name = self.entry_employee_name.get()
+        c.employee_surname = self.entry_employee_surname.get()
+        c.location = self.entry_employee_location.get()
+        c.years_of_work = self.entry_employee_years_of_work.get()
+        c.coordinates = c.get_coordinates()
+        c.marker.delete()
+        c.marker = self.map_employees.set_marker(*c.coordinates,
+                                                 text=f"{c.bar_name}: {c.employee_name} {c.employee_surname}")
+        self.listbox_employees.delete(idx)
+        self.listbox_employees.insert(idx, f"{c.employee_name} {c.employee_surname}")
+        self.btn_add_employee.config(text="Dodaj", command=self.add_employee)
+        for entry in [self.entry_employee_bar, self.entry_employee_name, self.entry_employee_surname,
+                      self.entry_employee_location, self.entry_employee_years_of_work]:
+            entry.delete(0, END)
+
+
+root = Tk()
+app = App(root)
+root.mainloop()
