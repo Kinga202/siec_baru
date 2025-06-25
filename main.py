@@ -4,6 +4,16 @@ import tkintermapview
 import requests
 from bs4 import BeautifulSoup
 
+def get_coordinates_from_wikipedia(location):
+    try:
+        adres_url = f'https://pl.wikipedia.org/wiki/{location}'
+        response_html = BeautifulSoup(requests.get(adres_url).content, 'html.parser')
+        latitude = float(response_html.select('.latitude')[1].text.replace(',', '.'))
+        longitude = float(response_html.select('.longitude')[1].text.replace(',', '.'))
+        return [latitude, longitude]
+    except Exception as e:
+        print("Błąd pobierania współrzędnych:", e)
+        return [52.23, 21.00]
 
 class Bar:
     def __init__(self, name, location, rating, map_widget):
@@ -11,22 +21,9 @@ class Bar:
         self.location = location
         self.rating = rating
         self.map_widget = map_widget
-        self.coordinates = self.get_coordinates()
+        self.coordinates = get_coordinates_from_wikipedia(self.location)
         self.marker = self.map_widget.set_marker(self.coordinates[0], self.coordinates[1],
                                                  text=f'{self.name} {self.rating}')
-
-    def get_coordinates(self):
-        try:
-            adres_url = f'https://pl.wikipedia.org/wiki/{self.location}'
-            response_html = BeautifulSoup(requests.get(adres_url).content, 'html.parser')
-            return [
-                float(response_html.select('.latitude')[1].text.replace(',', '.')),
-                float(response_html.select('.longitude')[1].text.replace(',', '.')),
-            ]
-        except Exception as e:
-            print("Błąd pobierania współrzędnych:", e)
-            return [52.23, 21.00]
-
 
 class Client:
     def __init__(self, bar_name, client_name, client_surname, location, visits, map_widget):
@@ -36,24 +33,11 @@ class Client:
         self.location = location
         self.visits = visits
         self.map_widget = map_widget
-        self.coordinates = self.get_coordinates()
+        self.coordinates = get_coordinates_from_wikipedia(self.location)
         self.marker = self.map_widget.set_marker(
             self.coordinates[0], self.coordinates[1],
             text=f'{self.bar_name}: {self.client_name} {self.client_surname}'
         )
-
-    def get_coordinates(self):
-        try:
-            adres_url = f'https://pl.wikipedia.org/wiki/{self.location}'
-            response_html = BeautifulSoup(requests.get(adres_url).content, 'html.parser')
-            return [
-                float(response_html.select('.latitude')[1].text.replace(',', '.')),
-                float(response_html.select('.longitude')[1].text.replace(',', '.')),
-            ]
-        except Exception as e:
-            print("Błąd pobierania współrzędnych:", e)
-            return [52.23, 21.00]
-
 
 class Employee:
     def __init__(self, bar_name, employee_name, employee_surname, location, years_of_work, map_widget):
@@ -63,23 +47,12 @@ class Employee:
         self.location = location
         self.years_of_work = years_of_work
         self.map_widget = map_widget
-        self.coordinates = self.get_coordinates()
+        self.coordinates = get_coordinates_from_wikipedia(self.location)
         self.marker = self.map_widget.set_marker(
             self.coordinates[0], self.coordinates[1],
             text=f'{self.bar_name}: {self.employee_name} {self.employee_surname}'
         )
 
-    def get_coordinates(self):
-        try:
-            adres_url = f'https://pl.wikipedia.org/wiki/{self.location}'
-            response_html = BeautifulSoup(requests.get(adres_url).content, 'html.parser')
-            return [
-                float(response_html.select('.latitude')[1].text.replace(',', '.')),
-                float(response_html.select('.longitude')[1].text.replace(',', '.')),
-            ]
-        except Exception as e:
-            print("Błąd pobierania współrzędnych:", e)
-            return [52.23, 21.00]
 
 class App:
     def __init__(self, root):
@@ -219,7 +192,8 @@ class App:
         self.listbox_employees = Listbox(frame_list, width=50, height=10)
         self.listbox_employees.pack()
 
-        Button(frame_list, text="Pokaż szczegóły", command=self.show_employee_details()).pack(side=LEFT, padx=5, pady=5)
+        Button(frame_list, text="Pokaż wszystkich pracowników", command=self.show_all_employees_on_map).pack(side=LEFT, padx=6, pady=6)
+        Button(frame_list, text="Pokaż szczegóły", command=self.show_employee_details).pack(side=LEFT, padx=5, pady=5)
         Button(frame_list, text="Usuń", command=self.remove_employee).pack(side=LEFT, padx=5, pady=5)
         Button(frame_list, text="Edytuj", command=self.edit_employee).pack(side=LEFT, padx=5, pady=5)
 
@@ -298,10 +272,15 @@ class App:
 
     def remove_bar(self):
         i = self.listbox_bars.curselection()
-        if not i: return
+        if not i:
+            return
         bar = self.bars.pop(i[0])
         bar.marker.delete()
         self.listbox_bars.delete(i)
+
+        self.label_bar_detail_name.config(text="...")
+        self.label_bar_detail_location.config(text="...")
+        self.label_bar_detail_rating.config(text="...")
 
     def edit_bar(self):
         i = self.listbox_bars.curselection()
@@ -323,7 +302,7 @@ class App:
         bar.name = name
         bar.location = location
         bar.rating = rating
-        bar.coordinates = bar.get_coordinates()
+        bar.coordinates = get_coordinates_from_wikipedia(bar.location)
         bar.marker.delete()
         bar.marker = self.map_bars.set_marker(*bar.coordinates, text=f"{bar.name} {bar.rating}")
         self.listbox_bars.delete(idx)
@@ -359,10 +338,14 @@ class App:
 
     def remove_client(self):
         i = self.listbox_clients.curselection()
-        if not i: return
+        if not i:
+            return
         c = self.clients.pop(i[0])
         c.marker.delete()
         self.listbox_clients.delete(i)
+
+        for lbl in self.detail_vars_clients:
+            lbl.config(text="...")
 
     def edit_client(self):
         i = self.listbox_clients.curselection()
@@ -387,7 +370,7 @@ class App:
         c.client_surname = self.entry_client_surname.get()
         c.location = self.entry_client_location.get()
         c.visits = self.entry_client_visits.get()
-        c.coordinates = c.get_coordinates()
+        c.coordinates = get_coordinates_from_wikipedia(c.location)
         c.marker.delete()
         c.marker = self.map_clients.set_marker(*c.coordinates, text=f"{c.bar_name}: {c.client_name} {c.client_surname}")
         self.listbox_clients.delete(idx)
@@ -424,14 +407,16 @@ class App:
         self.map_employees.set_position(*c.coordinates)
         self.map_employees.set_zoom(15)
 
-
     def remove_employee(self):
         i = self.listbox_employees.curselection()
-        if not i: return
-        c = self.employees.pop(i[0])
-        c.marker.delete()
+        if not i:
+            return
+        employee = self.employees.pop(i[0])
+        employee.marker.delete()
         self.listbox_employees.delete(i)
 
+        for lbl in self.detail_vars_employees:
+            lbl.config(text="...")
 
     def edit_employee(self):
         i = self.listbox_employees.curselection()
@@ -457,7 +442,7 @@ class App:
         c.employee_surname = self.entry_employee_surname.get()
         c.location = self.entry_employee_location.get()
         c.years_of_work = self.entry_employee_years_of_work.get()
-        c.coordinates = c.get_coordinates()
+        c.coordinates = get_coordinates_from_wikipedia(c.location)
         c.marker.delete()
         c.marker = self.map_employees.set_marker(*c.coordinates,
                                                  text=f"{c.bar_name}: {c.employee_name} {c.employee_surname}")
@@ -467,6 +452,19 @@ class App:
         for entry in [self.entry_employee_bar, self.entry_employee_name, self.entry_employee_surname,
                       self.entry_employee_location, self.entry_employee_years_of_work]:
             entry.delete(0, END)
+
+    def show_all_employees_on_map(self):
+        self.map_employees.delete_all_marker()  # usuń stare markery z mapy
+        if not self.employees:
+            messagebox.showinfo("Informacja", "Brak pracowników do wyświetlenia.")
+            return
+
+        for emp in self.employees:
+            emp.marker = self.map_employees.set_marker(
+                emp.coordinates[0],
+                emp.coordinates[1],
+                text=f"{emp.bar_name}: {emp.employee_name} {emp.employee_surname}"
+            )
 
 
 root = Tk()
