@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import tkintermapview
 import requests
 from bs4 import BeautifulSoup
+from collections import defaultdict
 
 def get_coordinates_from_wikipedia(location):
     try:
@@ -192,7 +193,7 @@ class App:
         self.listbox_employees = Listbox(frame_list, width=50, height=10)
         self.listbox_employees.pack()
 
-        Button(frame_list, text="Pokaż wszystkich pracowników", command=self.show_all_employees_on_map).pack(side=LEFT, padx=6, pady=6)
+        Button(frame_list, text="Pokaż wszystkich pracowników", command=self.show_all_employees).pack(side=LEFT, padx=6, pady=6)
         Button(frame_list, text="Pokaż szczegóły", command=self.show_employee_details).pack(side=LEFT, padx=5, pady=5)
         Button(frame_list, text="Usuń", command=self.remove_employee).pack(side=LEFT, padx=5, pady=5)
         Button(frame_list, text="Edytuj", command=self.edit_employee).pack(side=LEFT, padx=5, pady=5)
@@ -453,18 +454,30 @@ class App:
                       self.entry_employee_location, self.entry_employee_years_of_work]:
             entry.delete(0, END)
 
-    def show_all_employees_on_map(self):
-        self.map_employees.delete_all_marker()  # usuń stare markery z mapy
-        if not self.employees:
-            messagebox.showinfo("Informacja", "Brak pracowników do wyświetlenia.")
-            return
-
+    def show_all_employees(self):
+        # Usuń istniejące markery
         for emp in self.employees:
-            emp.marker = self.map_employees.set_marker(
-                emp.coordinates[0],
-                emp.coordinates[1],
-                text=f"{emp.bar_name}: {emp.employee_name} {emp.employee_surname}"
+            if emp.marker:
+                emp.marker.delete()
+
+        # Grupowanie pracowników po barze i lokalizacji
+        grouped = {}
+        for emp in self.employees:
+            key = (emp.bar_name, emp.location)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(emp)
+
+        for (bar_name, location), employees in grouped.items():
+            coords = get_coordinates_from_wikipedia(location)
+            # Zbuduj wieloliniowy tekst z imionami i nazwiskami
+            text = f"{bar_name}:\n" + "\n".join(
+                f"{emp.employee_name} {emp.employee_surname}" for emp in employees
             )
+            # Ustaw jeden marker z wieloma nazwiskami
+            marker = self.map_employees.set_marker(*coords, text=text)
+            for emp in employees:
+                emp.marker = marker  # przypisz marker do każdego, jeśli potrzebne
 
 
 root = Tk()
