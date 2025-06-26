@@ -455,31 +455,47 @@ class App:
             entry.delete(0, END)
 
     def show_all_employees(self):
-        # Usuń istniejące markery
+        print("Kliknięto: Pokaż wszystkich pracowników")
+
+        # 1. Usuń istniejące markery
         for emp in self.employees:
             if emp.marker:
                 emp.marker.delete()
+                emp.marker = None
 
-        # Grupowanie pracowników po barze i lokalizacji
-        grouped = {}
+        # 2. Sprawdź, czy w ogóle są pracownicy
+        if not self.employees:
+            print("Brak pracowników w liście self.employees!")
+            return
+
+        # 3. Grupuj po lokalizacji (miejscowości)
+        location_groups = {}
         for emp in self.employees:
-            key = (emp.bar_name, emp.location)
-            if key not in grouped:
-                grouped[key] = []
-            grouped[key].append(emp)
+            location_groups.setdefault(emp.location, []).append(emp)
 
-        for (bar_name, location), employees in grouped.items():
+        print(f"Znaleziono {len(location_groups)} lokalizacji do wyświetlenia.")
+
+        # 4. Tworzenie markerów
+        for location, employees_in_city in location_groups.items():
+            print(f"\n📍 Przetwarzam lokalizację: {location} ({len(employees_in_city)} pracowników)")
+
             coords = get_coordinates_from_wikipedia(location)
-            # Zbuduj wieloliniowy tekst z imionami i nazwiskami
-            text = f"{bar_name}:\n" + "\n".join(
-                f"{emp.employee_name} {emp.employee_surname}" for emp in employees
+            if coords is None:
+                print(f"❌ Nie udało się pobrać współrzędnych dla: {location}")
+                continue
+
+            # Tworzenie opisu markera
+            description = f"{location}:\n" + "\n".join(
+                f"{emp.bar_name}: {emp.employee_name} {emp.employee_surname}" for emp in employees_in_city
             )
-            # Ustaw jeden marker z wieloma nazwiskami
-            marker = self.map_employees.set_marker(*coords, text=text)
-            for emp in employees:
-                emp.marker = marker  # przypisz marker do każdego, jeśli potrzebne
 
+            # Tworzenie jednego markera dla miasta
+            marker = self.map_employees.set_marker(*coords, text=description)
+            print(f"✅ Ustawiono marker w {location} na {coords}")
 
+            # Przypisanie markera do każdego pracownika (jeśli potrzebne)
+            for emp in employees_in_city:
+                emp.marker = marker
 root = Tk()
 app = App(root)
 root.mainloop()
